@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { MessageCircle, X, Send } from 'lucide-react'
-import axios from 'axios'
+import api from '../api'
 import ReactMarkdown from 'react-markdown'
 import './Chatbot.css'
 
@@ -45,7 +45,7 @@ export default function Chatbot({ documentText, loanText, taxText }) {
         requestBody.document_text = documentText
       }
 
-      const response = await axios.post('/api/chat/', requestBody)
+      const response = await api.post('/api/chat/', requestBody)
 
       setMessages((prev) => [
         ...prev,

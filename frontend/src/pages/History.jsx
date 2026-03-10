@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileText, Eye, Trash2, Search, Grid, List, Loader } from 'lucide-react'
-import axios from 'axios'
+import api from '../api'
 import './History.css'
 
 const ITEMS_PER_PAGE = 12
@@ -24,7 +24,7 @@ export default function History() {
   const fetchDocuments = async () => {
     try {
       setLoading(true)
-      const response = await axios.get('/api/history/')
+      const response = await api.get('/api/history/')
       setDocuments(response.data.documents || [])
     } catch {
       setError('Failed to load document history.')
@@ -36,7 +36,7 @@ export default function History() {
   const handleDelete = async (e, docId) => {
     e.stopPropagation()
     try {
-      await axios.delete(`/api/history/${docId}/`)
+      await api.delete(`/api/history/${docId}/`)
       setDocuments((prev) => prev.filter((d) => d.id !== docId))
     } catch {
       // silently ignore

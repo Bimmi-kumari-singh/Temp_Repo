@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { XCircle } from 'lucide-react'
-import axios from 'axios'
+import api from '../api'
 import './Processing.css'
 
 export default function Processing({ uploadedDoc, setUploadedDoc }) {
@@ -51,7 +51,7 @@ export default function Processing({ uploadedDoc, setUploadedDoc }) {
           formData.append('pdf_file', uploadedDoc.file)
           formData.append('model', uploadedDoc.model)
 
-          const response = await axios.post('/api/extract/', formData, {
+          const response = await api.post('/api/extract/', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           })
 
@@ -90,7 +90,7 @@ export default function Processing({ uploadedDoc, setUploadedDoc }) {
       formData.append('tax_file', uploadedDoc.taxFile)
       formData.append('model', uploadedDoc.model)
 
-      axios
+      api
         .post('/api/extract/', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         })
@@ -114,7 +114,7 @@ export default function Processing({ uploadedDoc, setUploadedDoc }) {
       formData.append('pdf_file', uploadedDoc.file)
       formData.append('model', uploadedDoc.model)
 
-      axios
+      api
         .post('/api/extract/', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         })
