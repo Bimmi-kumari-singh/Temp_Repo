@@ -30,10 +30,12 @@ export default function Processing({ uploadedDoc, setUploadedDoc }) {
           formData.append('loan_file', uploadedDoc.loanFile)
           formData.append('tax_file', uploadedDoc.taxFile)
           formData.append('model', uploadedDoc.model)
-
+          
+          console.log("Calling backend api/extract/ with formData:", formData);
           const response = await api.post('/api/extract/', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           })
+          console.log("Backend response:", response.data);
 
           if (cancelled) return
 
