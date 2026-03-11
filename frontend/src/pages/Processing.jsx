@@ -31,7 +31,7 @@ export default function Processing({ uploadedDoc, setUploadedDoc }) {
           formData.append('tax_file', uploadedDoc.taxFile)
           formData.append('model', uploadedDoc.model)
 
-          const response = await axios.post('/api/extract/', formData, {
+          const response = await api.post('/api/extract/', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           })
 
