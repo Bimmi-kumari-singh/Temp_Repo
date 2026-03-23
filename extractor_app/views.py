@@ -116,7 +116,6 @@ Strictly the response must be in json format"""
             },
             json={
                 "messages": messages,
-                "temperature": 0.2,
                 "max_completion_tokens": 4000,
             },
             timeout=60.0,
