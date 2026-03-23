@@ -1,5 +1,7 @@
 import os
 import fitz
+import cloudinary
+import cloudinary.uploader
 from django.shortcuts import render
 from django.conf import settings
 from django.core.files.storage import default_storage
@@ -11,6 +13,32 @@ import google.generativeai as genai
 
 load_dotenv()
 
+
+def sanitize_text(text):
+    """Replace problematic unicode characters that cause charmap codec errors on Windows."""
+    if not text:
+        return text
+    replacements = {
+        '\u2717': 'X',   # \u2717 -> X
+        '\u2718': 'X',   # \u2718 -> X
+        '\u2713': '/',   # \u2713 -> /
+        '\u2714': '/',   # \u2714 -> /
+        '\u2715': 'X',   # \u2715 -> X
+        '\u2716': 'X',   # \u2716 -> X
+        '\u2022': '-',   # \u2022 -> -
+        '\u2019': "'",   # ' -> '
+        '\u2018': "'",   # ' -> '
+        '\u201c': '"',   # " -> "
+        '\u201d': '"',   # " -> "
+        '\u2013': '-',   # \u2013 -> -
+        '\u2014': '--',  # \u2014 -> --
+        '\u2026': '...', # \u2026 -> ...
+    }
+    for char, replacement in replacements.items():
+        text = text.replace(char, replacement)
+    return text.encode('ascii', errors='replace').decode('ascii')
+
+
 # Load keys from environment variables or Django settings
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -18,13 +46,36 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 openai.api_key = OPENAI_API_KEY
 genai.configure(api_key=GEMINI_API_KEY)
 
+# Configure Cloudinary
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+)
+
+
+def upload_to_cloudinary(file_path, original_filename):
+    """Upload a file to Cloudinary and return the secure URL."""
+    try:
+        result = cloudinary.uploader.upload(
+            file_path,
+            resource_type="raw",
+            folder="loan_origination/uploads",
+            public_id=os.path.splitext(original_filename)[0],
+            overwrite=True,
+        )
+        return result.get("secure_url", "")
+    except Exception as e:
+        print(f"Cloudinary upload error: {e}")
+        return ""
+
 # Function to extract text from PDF
 def extract_text_from_pdf(file_path):
     try:
         doc = fitz.open(file_path)
         extracted_text = "\n".join([page.get_text() for page in doc])
         doc.close()
-        return extracted_text
+        return sanitize_text(extracted_text)
     except Exception as e:
         return f"Error reading PDF: {str(e)}"
 
@@ -57,12 +108,12 @@ Strictly the response must be in json format"""
                 temperature=0.2,
                 max_completion_tokens=4000,
             )
-            return response.choices[0].message['content']
+            return sanitize_text(response.choices[0].message['content'])
 
         elif selected_model == "gemini":
             model = genai.GenerativeModel('gemini-2.5-flash')
             response = model.generate_content(prompt)
-            return response.text
+            return sanitize_text(response.text)
 
         else:
             return "Invalid model selected."
@@ -92,7 +143,8 @@ def extract_view(request):
                 destination.write(chunk)
 
         file_name = pdf_file.name
-        file_url = os.path.join(settings.MEDIA_URL, "uploads", pdf_file.name)
+        # Upload to Cloudinary and get the public URL
+        file_url = upload_to_cloudinary(file_path, pdf_file.name)
 
         # Extract text from PDF
         extracted_text = extract_text_from_pdf(file_path)

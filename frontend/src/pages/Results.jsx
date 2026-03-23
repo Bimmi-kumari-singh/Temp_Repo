@@ -437,7 +437,7 @@ export default function Results({ uploadedDoc }) {
           <div className="pdf-viewer">
             {fileUrl ? (
               <iframe
-                src={fileUrl}
+                src={`https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`}
                 title="PDF Viewer"
                 className="pdf-iframe"
               />

@@ -1,6 +1,8 @@
 import os
 import json
 import fitz
+import cloudinary
+import cloudinary.uploader
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.http import JsonResponse
@@ -11,6 +13,32 @@ from dotenv import load_dotenv
 import openai
 import google.generativeai as genai
 
+
+def sanitize_text(text):
+    """Replace problematic unicode characters that cause charmap codec errors on Windows."""
+    if not text:
+        return text
+    replacements = {
+        '\u2717': 'X',   # ✗ -> X
+        '\u2718': 'X',   # ✘ -> X
+        '\u2713': '/',   # ✓ -> /
+        '\u2714': '/',   # ✔ -> /
+        '\u2715': 'X',   # ✕ -> X
+        '\u2716': 'X',   # ✖ -> X
+        '\u2022': '-',   # • -> -
+        '\u2019': "'",   # ' -> '
+        '\u2018': "'",   # ' -> '
+        '\u201c': '"',   # " -> "
+        '\u201d': '"',   # " -> "
+        '\u2013': '-',   # – -> -
+        '\u2014': '--',  # — -> --
+        '\u2026': '...', # … -> ...
+    }
+    for char, replacement in replacements.items():
+        text = text.replace(char, replacement)
+    # Fallback: encode to ascii, replacing any remaining problematic chars
+    return text.encode('ascii', errors='replace').decode('ascii')
+
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -19,13 +47,37 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 openai.api_key = OPENAI_API_KEY
 genai.configure(api_key=GEMINI_API_KEY)
 
+# Configure Cloudinary
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+)
+
+
+def upload_to_cloudinary(file_path, original_filename):
+    """Upload a file to Cloudinary and return the secure URL."""
+    try:
+        # Use raw resource_type for PDFs so they are served as-is
+        result = cloudinary.uploader.upload(
+            file_path,
+            resource_type="raw",
+            folder="loan_origination/uploads",
+            public_id=os.path.splitext(original_filename)[0],
+            overwrite=True,
+        )
+        return result.get("secure_url", "")
+    except Exception as e:
+        print(f"Cloudinary upload error: {e}")
+        return ""
+
 
 def extract_text_from_pdf(file_path):
     try:
         doc = fitz.open(file_path)
         extracted_text = "\n".join([page.get_text() for page in doc])
         doc.close()
-        return extracted_text
+        return sanitize_text(extracted_text)
     except Exception as e:
         return f"Error reading PDF: {str(e)}"
 
@@ -92,18 +144,18 @@ Strictly the response must be in valid JSON format only, no markdown fences."""
                 temperature=0.2,
                 max_completion_tokens=4000,
             )
-            return response.choices[0].message['content']
+            return sanitize_text(response.choices[0].message['content'])
 
         elif selected_model == "gemini":
             model = genai.GenerativeModel('gemini-2.5-flash')
             response = model.generate_content(prompt)
-            return response.text
+            return sanitize_text(response.text)
 
         else:
             return json.dumps({"error": "Invalid model selected."})
 
     except Exception as e:
-        return json.dumps({"error": f"Error using model: {str(e)}"})
+        return json.dumps({"error": f"Error using model: {sanitize_text(str(e))}"})
 
 
 @csrf_exempt
@@ -147,7 +199,7 @@ def api_extract(request):
         })
     
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return JsonResponse({"error": sanitize_text(str(e))}, status=500)
 
 
 def _process_document(pdf_file, selected_model, document_type):
@@ -160,7 +212,8 @@ def _process_document(pdf_file, selected_model, document_type):
         for chunk in pdf_file.chunks():
             destination.write(chunk)
 
-    file_url = settings.MEDIA_URL + "uploads/" + pdf_file.name
+    # Upload to Cloudinary and get the public URL
+    file_url = upload_to_cloudinary(file_path, pdf_file.name)
 
     extracted_text = extract_text_from_pdf(file_path)
 
@@ -202,7 +255,8 @@ def _process_single_document(pdf_file, selected_model):
         for chunk in pdf_file.chunks():
             destination.write(chunk)
 
-    file_url = settings.MEDIA_URL + "uploads/" + pdf_file.name
+    # Upload to Cloudinary and get the public URL
+    file_url = upload_to_cloudinary(file_path, pdf_file.name)
 
     extracted_text = extract_text_from_pdf(file_path)
 
@@ -233,8 +287,6 @@ def _process_single_document(pdf_file, selected_model):
     })
 
 
-@csrf_exempt
-@require_http_methods(["POST"])
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_chat(request):
@@ -315,7 +367,7 @@ Provide a clear, concise answer based on the document content."""
                 }, status=500)
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return JsonResponse({"error": sanitize_text(str(e))}, status=500)
 
 
 @csrf_exempt
