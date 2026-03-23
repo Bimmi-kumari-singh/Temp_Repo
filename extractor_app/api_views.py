@@ -1,6 +1,7 @@
 import os
 import json
 import fitz
+import httpx
 import cloudinary
 import cloudinary.uploader
 from django.conf import settings
@@ -10,7 +11,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from dotenv import load_dotenv
 
-import openai
 import google.generativeai as genai
 
 
@@ -41,11 +41,14 @@ def sanitize_text(text):
 
 load_dotenv()
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-openai.api_key = OPENAI_API_KEY
 genai.configure(api_key=GEMINI_API_KEY)
+
+# Azure OpenAI Configuration
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY", "")
+AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
 
 # Configure Cloudinary
 cloudinary.config(
@@ -82,7 +85,7 @@ def extract_text_from_pdf(file_path):
         return f"Error reading PDF: {str(e)}"
 
 
-def extract_entities_from_model(extracted_text, selected_model, document_type="loan"):
+def extract_entities_from_model(extracted_text, document_type="loan"):
     """
     Extract entities from document based on document type.
     document_type: 'loan' or 'tax'
@@ -137,25 +140,38 @@ Strictly the response must be in valid JSON format only, no markdown fences."""
         return json.dumps({"error": f"Invalid document type: {document_type}"})
 
     try:
-        if selected_model == "openai":
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_completion_tokens=4000,
-            )
-            return sanitize_text(response.choices[0].message['content'])
+        if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_API_KEY or not AZURE_OPENAI_DEPLOYMENT:
+            return json.dumps({"error": "Azure OpenAI is not configured. Please set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and AZURE_OPENAI_DEPLOYMENT in .env"})
 
-        elif selected_model == "gemini":
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            response = model.generate_content(prompt)
-            return sanitize_text(response.text)
+        url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/{AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version={AZURE_OPENAI_API_VERSION}"
 
+        messages = [
+            {"role": "user", "content": prompt}
+        ]
+
+        resp = httpx.post(
+            url,
+            headers={
+                "Content-Type": "application/json",
+                "api-key": AZURE_OPENAI_API_KEY,
+            },
+            json={
+                "messages": messages,
+                "temperature": 0.2,
+                "max_completion_tokens": 4000,
+            },
+            timeout=60.0,
+        )
+
+        if resp.status_code == 200:
+            data = resp.json()
+            content = data["choices"][0]["message"]["content"]
+            return sanitize_text(content)
         else:
-            return json.dumps({"error": "Invalid model selected."})
+            return json.dumps({"error": f"Azure OpenAI error: {resp.status_code} - {resp.text}"})
 
     except Exception as e:
-        return json.dumps({"error": f"Error using model: {sanitize_text(str(e))}"})
+        return json.dumps({"error": f"Error using Azure OpenAI: {sanitize_text(str(e))}"})
 
 
 @csrf_exempt
@@ -166,11 +182,9 @@ def api_extract(request):
     tax_file = request.FILES.get('tax_file')
     single_file = request.FILES.get('pdf_file')
     
-    selected_model = request.POST.get('model', 'openai')
-    
     # Handle single file upload (backward compatibility)
     if single_file and not loan_file and not tax_file:
-        return _process_single_document(single_file, selected_model)
+        return _process_single_document(single_file)
     
     # Handle dual document upload
     if not loan_file or not tax_file:
@@ -180,18 +194,18 @@ def api_extract(request):
     
     try:
         # Process loan document
-        loan_result = _process_document(loan_file, selected_model, "loan")
+        loan_result = _process_document(loan_file, "loan")
         if "error" in loan_result:
             return JsonResponse(loan_result, status=500)
         
         # Process tax document
-        tax_result = _process_document(tax_file, selected_model, "tax")
+        tax_result = _process_document(tax_file, "tax")
         if "error" in tax_result:
             return JsonResponse(tax_result, status=500)
         
         return JsonResponse({
             "success": True,
-            "model": selected_model,
+            "model": "azure",
             "documents": {
                 "loan": loan_result,
                 "tax": tax_result
@@ -202,7 +216,7 @@ def api_extract(request):
         return JsonResponse({"error": sanitize_text(str(e))}, status=500)
 
 
-def _process_document(pdf_file, selected_model, document_type):
+def _process_document(pdf_file, document_type):
     """Process a single document and return extracted entities"""
     save_dir = os.path.join(settings.MEDIA_ROOT, "uploads")
     os.makedirs(save_dir, exist_ok=True)
@@ -223,7 +237,7 @@ def _process_document(pdf_file, selected_model, document_type):
             "file_name": pdf_file.name
         }
 
-    model_output = extract_entities_from_model(extracted_text, selected_model, document_type)
+    model_output = extract_entities_from_model(extracted_text, document_type)
 
     try:
         cleaned = model_output.strip()
@@ -245,7 +259,7 @@ def _process_document(pdf_file, selected_model, document_type):
     }
 
 
-def _process_single_document(pdf_file, selected_model):
+def _process_single_document(pdf_file):
     """Process single document for backward compatibility"""
     save_dir = os.path.join(settings.MEDIA_ROOT, "uploads")
     os.makedirs(save_dir, exist_ok=True)
@@ -265,7 +279,7 @@ def _process_single_document(pdf_file, selected_model):
             "error": extracted_text or "Failed to extract text from PDF"
         }, status=500)
 
-    model_output = extract_entities_from_model(extracted_text, selected_model, "loan")
+    model_output = extract_entities_from_model(extracted_text, "loan")
 
     try:
         cleaned = model_output.strip()
@@ -281,7 +295,7 @@ def _process_single_document(pdf_file, selected_model):
         "file_name": pdf_file.name,
         "file_url": file_url,
         "file_size": pdf_file.size,
-        "model": selected_model,
+        "model": "azure",
         "extracted_text": extracted_text[:2000],
         "entities": entities,
     })
@@ -298,11 +312,6 @@ def api_chat(request):
         tax_text = body.get("tax_text", "")
         history = body.get("history", [])
 
-        azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
-        azure_key = os.getenv("AZURE_OPENAI_API_KEY", "")
-        azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
-        azure_api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01")
-
         # Build context from available documents
         context_parts = []
         if loan_text:
@@ -314,9 +323,8 @@ def api_chat(request):
         
         context = "\n".join(context_parts) if context_parts else "No document context available."
 
-        if azure_endpoint and azure_key and azure_deployment:
-            import httpx
-            url = f"{azure_endpoint}/openai/deployments/{azure_deployment}/chat/completions?api-version={azure_api_version}"
+        if AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY and AZURE_OPENAI_DEPLOYMENT:
+            url = f"{AZURE_OPENAI_ENDPOINT}/openai/deployments/{AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version={AZURE_OPENAI_API_VERSION}"
             
             messages = [
                 {
@@ -337,7 +345,7 @@ Answer questions based on the document content. If a question relates to specifi
                 url,
                 headers={
                     "Content-Type": "application/json",
-                    "api-key": azure_key,
+                    "api-key": AZURE_OPENAI_API_KEY,
                 },
                 json={"messages": messages, "max_completion_tokens": 1000},
                 timeout=30.0,

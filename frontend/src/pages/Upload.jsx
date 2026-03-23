@@ -7,7 +7,6 @@ export default function Upload({ setUploadedDoc }) {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [files, setFiles] = useState([])
-  const [selectedModel, setSelectedModel] = useState('openai')
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState('')
 
@@ -60,7 +59,7 @@ export default function Upload({ setUploadedDoc }) {
     setUploadedDoc({
       loanFile: files[0],
       taxFile: files[1],
-      model: selectedModel,
+      model: 'azure',
     })
     navigate('/processing')
   }
@@ -71,7 +70,7 @@ export default function Upload({ setUploadedDoc }) {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
   }
 
-  const currentStep = files.length >= 2 ? 3 : files.length >= 1 ? 2 : 1
+  const currentStep = files.length >= 2 ? 2 : 1
 
   return (
     <>
@@ -95,12 +94,7 @@ export default function Upload({ setUploadedDoc }) {
           <div className="step-arrow">&rarr;</div>
           <div className="step">
             <div className={`step-number ${currentStep >= 2 ? 'active' : ''}`}>2</div>
-            <div className={`step-label ${currentStep >= 2 ? 'active' : ''}`}>Choose Model</div>
-          </div>
-          <div className="step-arrow">&rarr;</div>
-          <div className="step">
-            <div className={`step-number ${currentStep >= 3 ? 'active' : ''}`}>3</div>
-            <div className={`step-label ${currentStep >= 3 ? 'active' : ''}`}>Confirm</div>
+            <div className={`step-label ${currentStep >= 2 ? 'active' : ''}`}>Extract</div>
           </div>
         </div>
 
@@ -150,34 +144,6 @@ export default function Upload({ setUploadedDoc }) {
               ))}
             </div>
           )}
-        </div>
-
-        <div className="model-selection">
-          <h3>Choose LLM Model</h3>
-          <div className="model-cards">
-            <label className={`model-card ${selectedModel === 'openai' ? 'selected' : ''}`}>
-              <input
-                type="radio"
-                name="model"
-                value="openai"
-                checked={selectedModel === 'openai'}
-                onChange={() => setSelectedModel('openai')}
-              />
-              <div className="model-name">OpenAI GPT</div>
-              <div className="model-description">Fast and accurate for standard documents</div>
-            </label>
-            <label className={`model-card ${selectedModel === 'gemini' ? 'selected' : ''}`}>
-              <input
-                type="radio"
-                name="model"
-                value="gemini"
-                checked={selectedModel === 'gemini'}
-                onChange={() => setSelectedModel('gemini')}
-              />
-              <div className="model-name">Google Gemini</div>
-              <div className="model-description">Advanced processing for complex layouts</div>
-            </label>
-          </div>
         </div>
 
         <div className="action-buttons">

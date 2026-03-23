@@ -39,12 +39,12 @@ export default function Results({ uploadedDoc }) {
     entities = docData?.entities || {}
     fileName = docData?.file_name || (activeDoc === 'loan' ? 'Loan Application' : 'Tax Return')
     fileUrl = docData?.file_url
-    modelLabel = result.model === 'gemini' ? 'Google Gemini' : 'OpenAI GPT'
+    modelLabel = 'Azure OpenAI GPT'
   } else {
     entities = result.entities || {}
     fileName = result.file_name
     fileUrl = result.file_url
-    modelLabel = result.model === 'gemini' ? 'Google Gemini' : 'OpenAI GPT'
+    modelLabel = 'Azure OpenAI GPT'
   }
 
   const handleExport = () => {
