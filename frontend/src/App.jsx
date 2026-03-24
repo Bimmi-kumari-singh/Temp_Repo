@@ -7,6 +7,7 @@ import Processing from './pages/Processing'
 import Results from './pages/Results'
 import History from './pages/History'
 import Layout from './components/Layout'
+import LandingPage from './pages/LandingPage'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(
@@ -42,7 +43,15 @@ function App() {
       <Route
         path="/"
         element={
-          isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login onLogin={handleLogin} />
+          isAuthenticated ? <Navigate to="/landing" replace /> : <Login onLogin={handleLogin} />
+        }
+      />
+      <Route
+        path="/landing"
+        element={
+          isAuthenticated ? (
+            <LandingPage />
+          ) : <Navigate to="/" replace />
         }
       />
       <Route
@@ -95,7 +104,7 @@ function App() {
           ) : <Navigate to="/" replace />
         }
       />
-      <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/'} replace />} />
+      <Route path="*" element={<Navigate to={isAuthenticated ? '/landing' : '/'} replace />} />
     </Routes>
   )
 }
