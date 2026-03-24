@@ -128,7 +128,7 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = BASE_DIR / 'frontend' / 'public' / 'media'
 
 # Allow iframes from same origin (for development)
 X_FRAME_OPTIONS = 'SAMEORIGIN'

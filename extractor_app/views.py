@@ -92,7 +92,8 @@ def extract_view(request):
                 destination.write(chunk)
 
         file_name = pdf_file.name
-        file_url = os.path.join(settings.MEDIA_URL, "uploads", pdf_file.name)
+        # Generate absolute URL for file access (needed when frontend is deployed separately)
+        file_url = settings.BACKEND_URL + settings.MEDIA_URL + "uploads/" + pdf_file.name
 
         # Extract text from PDF
         extracted_text = extract_text_from_pdf(file_path)

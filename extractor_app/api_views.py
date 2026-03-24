@@ -109,12 +109,14 @@ Strictly the response must be in valid JSON format only, no markdown fences."""
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_extract(request):
+    print("[DEBUG] API extract endpoint called")
     # Check if this is a dual document upload
     loan_file = request.FILES.get('loan_file')
     tax_file = request.FILES.get('tax_file')
     single_file = request.FILES.get('pdf_file')
     
     selected_model = request.POST.get('model', 'openai')
+    print(f"[DEBUG] Model: {selected_model}, Loan: {loan_file}, Tax: {tax_file}, Single: {single_file}")
     
     # Handle single file upload (backward compatibility)
     if single_file and not loan_file and not tax_file:
@@ -128,14 +130,20 @@ def api_extract(request):
     
     try:
         # Process loan document
+        print("[DEBUG] Processing loan document...")
         loan_result = _process_document(loan_file, selected_model, "loan")
         if "error" in loan_result:
+            print(f"[DEBUG] Loan processing error: {loan_result}")
             return JsonResponse(loan_result, status=500)
+        print("[DEBUG] Loan document processed successfully")
         
         # Process tax document
+        print("[DEBUG] Processing tax document...")
         tax_result = _process_document(tax_file, selected_model, "tax")
         if "error" in tax_result:
+            print(f"[DEBUG] Tax processing error: {tax_result}")
             return JsonResponse(tax_result, status=500)
+        print("[DEBUG] Tax document processed successfully")
         
         return JsonResponse({
             "success": True,
@@ -152,25 +160,33 @@ def api_extract(request):
 
 def _process_document(pdf_file, selected_model, document_type):
     """Process a single document and return extracted entities"""
+    print(f"[DEBUG] _process_document called for {document_type}: {pdf_file.name}")
     save_dir = os.path.join(settings.MEDIA_ROOT, "uploads")
     os.makedirs(save_dir, exist_ok=True)
     file_path = os.path.join(save_dir, pdf_file.name)
+    print(f"[DEBUG] Saving to: {file_path}")
 
     with default_storage.open(file_path, 'wb+') as destination:
         for chunk in pdf_file.chunks():
             destination.write(chunk)
 
-    file_url = settings.MEDIA_URL + "uploads/" + pdf_file.name
+    # Generate absolute URL for file access (needed when frontend is deployed separately)
+    file_url = settings.BACKEND_URL + settings.MEDIA_URL + "uploads/" + pdf_file.name
 
+    print("[DEBUG] Extracting text from PDF...")
     extracted_text = extract_text_from_pdf(file_path)
+    print(f"[DEBUG] Extracted {len(extracted_text) if extracted_text else 0} characters")
 
     if not extracted_text or extracted_text.startswith("Error"):
+        print(f"[DEBUG] Text extraction failed: {extracted_text}")
         return {
             "error": extracted_text or "Failed to extract text from PDF",
             "file_name": pdf_file.name
         }
 
+    print(f"[DEBUG] Calling {selected_model} model for entity extraction...")
     model_output = extract_entities_from_model(extracted_text, selected_model, document_type)
+    print(f"[DEBUG] Model output received: {len(model_output) if model_output else 0} characters")
 
     try:
         cleaned = model_output.strip()
@@ -202,7 +218,8 @@ def _process_single_document(pdf_file, selected_model):
         for chunk in pdf_file.chunks():
             destination.write(chunk)
 
-    file_url = settings.MEDIA_URL + "uploads/" + pdf_file.name
+    # Generate absolute URL for file access (needed when frontend is deployed separately)
+    file_url = settings.BACKEND_URL + settings.MEDIA_URL + "uploads/" + pdf_file.name
 
     extracted_text = extract_text_from_pdf(file_path)
 
