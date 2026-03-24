@@ -137,7 +137,7 @@ export default function Processing({ uploadedDoc, setUploadedDoc }) {
     }
   }
 
-  const modelLabel = uploadedDoc?.model === 'gemini' ? 'Google Gemini' : 'OpenAI GPT'
+  const modelLabel = 'Azure OpenAI GPT'
 
   return (
     <>
@@ -187,13 +187,13 @@ export default function Processing({ uploadedDoc, setUploadedDoc }) {
         <main className="processing-main">
           <XCircle size={80} className="error-icon" />
           <h2>Processing failed</h2>
-          <p className="error-message-text">Please try again or select a different model.</p>
+          <p className="error-message-text">Please try again.</p>
           <div className="error-details">
             <strong>Error Details:</strong> {errorMsg}
           </div>
           <div className="proc-action-buttons">
             <button className="button button-primary" onClick={handleRetry}>Retry</button>
-            <button className="button button-secondary" onClick={() => navigate('/upload')}>Change Model</button>
+            <button className="button button-secondary" onClick={() => navigate('/upload')}>Re-upload</button>
             <button className="button button-tertiary" onClick={() => navigate('/dashboard')}>Cancel</button>
           </div>
         </main>
