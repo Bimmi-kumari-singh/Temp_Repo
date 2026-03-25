@@ -1,7 +1,7 @@
 import { FileText, ExternalLink, ArrowRight } from 'lucide-react'
 import './LandingPage.css'
 
-const CLOSE_PACKAGE_URL = 'https://mb9vpjs3-4200.inc1.devtunnels.ms/'
+const CLOSE_PACKAGE_URL = 'https://fastapi-loan.vercel.app/'
 
 export default function LandingPage() {
   const handleClosePackage = () => {
