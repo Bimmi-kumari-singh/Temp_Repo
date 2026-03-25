@@ -1,9 +1,12 @@
+import { useNavigate } from 'react-router-dom'
 import { FileText, ExternalLink, ArrowRight } from 'lucide-react'
 import './LandingPage.css'
 
 const CLOSE_PACKAGE_URL = 'https://mb9vpjs3-4200.inc1.devtunnels.ms/'
 
 export default function LandingPage() {
+  const navigate = useNavigate()
+
   const handleClosePackage = () => {
     window.open(CLOSE_PACKAGE_URL, '_blank', 'noopener,noreferrer')
   }
@@ -30,7 +33,7 @@ export default function LandingPage() {
             Open Portal <ExternalLink size={16} />
           </span>
         </button>
-        <a className="landing-card" href="/dashboard">
+        <button className="landing-card" onClick={() => navigate('/dashboard')}>
           <div className="landing-card-icon origination-icon">
             <ArrowRight size={32} />
           </div>
@@ -39,7 +42,7 @@ export default function LandingPage() {
           <span className="landing-card-action">
             Continue <ArrowRight size={16} />
           </span>
-        </a>
+        </button>
       </div>
     </main>
   )
