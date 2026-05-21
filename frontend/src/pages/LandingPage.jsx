@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { FileText, ExternalLink, ArrowRight } from 'lucide-react'
 import './LandingPage.css'
 
-const CLOSE_PACKAGE_URL = 'https://fastapi-loan.vercel.app/'
+const CLOSE_PACKAGE_URL = 'https://dazzling-zuccutto-024696.netlify.app/'
 
 export default function LandingPage() {
   const navigate = useNavigate()
